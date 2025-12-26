@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package hand_control;
+
+service Hand {
+  rpc Gesture (GestureRequest) returns (GestureResponse) {}
+}
+
+message GestureRequest {
+  enum GestureType {
+    ROCK = 0;
+    SCISSORS = 1;
+    PAPER = 2;
+    PENCIL_GRIP = 3;
+    NEUTRAL = 4;
+  }
+  GestureType gesture = 1;
+}
+
+message GestureResponse {
+  bool success = 1;
+  string message = 2;
+  map<int32, string> finger_positions = 3; // 각 손가락별 관절 위치 정보
+}
