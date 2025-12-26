@@ -53,7 +53,7 @@ def test_read_positions():
 
         # 각 손가락별로 voltage 0 보내고 바로 포지션 읽기
         print("\nSending voltage 0 and reading positions for each finger:")
-        for can_id in range(2, 6): # 레인지 변경을 통해 여러개로 확장 가능.
+        for can_id in range(2, 6):
             # voltage 0 보내기
             pcan.set_target_values(can_id, [0, 0, 0, 0])
             time.sleep(0.1)
@@ -77,7 +77,7 @@ def test_read_positions():
         print(f"\nError during test: {e}")
 
     finally:
-        for can_id in range(2, 6): # 레인지 변경을 통해 여러개로 확장 가능.
+        for can_id in range(2, 6):
             # voltage 0 보내기
             pcan.set_target_values(can_id, [0, 0, 0, 0])
             time.sleep(0.1)
@@ -86,7 +86,8 @@ def test_read_positions():
         print("\nTest complete!")
 
 
-def test_rock_paper_scissors():
+
+def test_Hand_Position_mode():
     # Initialize PCAN
     pcan = PCANHandler()
     if not pcan.is_connected():
@@ -260,6 +261,171 @@ def test_rock_paper_scissors():
                 except ValueError:
                     print("Invalid input. Please enter numbers only.")
                 
+            elif choice == '7':
+                test_read_positions()
+                
+            elif choice == '8':
+                print("\nMaking pencil grip gesture...")
+                positions = GESTURES['grip_pencil']
+                
+                # Apply positions for all fingers simultaneously
+                for can_id in range(2, 6):
+                    pcan.set_target_values(can_id, positions[can_id])
+                
+                # 각 손가락의 포지션 값 읽기
+                print("\nReading joint positions:")
+                for can_id in range(2, 6):
+                    response = pcan.receive_frame(timeout=1.0)
+                    if response and 'positions' in response:
+                        finger_name = {
+                            2: "Thumb",
+                            3: "Index",
+                            4: "Middle",
+                            5: "Ring/Little"
+                        }[can_id]
+                        print(f"\n{finger_name} (CAN ID {can_id}):")
+                        for i, pos in enumerate(response['positions']):
+                            print(f"  Joint {i+1}: {pos}")
+                    else:
+                        print(f"\nNo response received for CAN ID {can_id}")
+                
+            elif choice == '9':
+                break
+                
+            else:
+                print("Invalid choice. Please enter 1-9")
+
+    except KeyboardInterrupt:
+        print("\nTest interrupted by user")
+    except Exception as e:
+        print(f"\nError during test: {e}")
+    finally:
+        # Clean up
+        print("\nCleaning up...")
+        # Reset to neutral position (paper)
+        positions = GESTURES['paper']
+        for can_id in range(2, 6):
+            pcan.set_target_values(can_id, positions[can_id])
+        pcan.set_hand_status(ServoStatus.OFF, ControlMode.POSITION)
+        pcan.close()
+        print("Test completed")
+
+
+def voltage_position_control(pcan, target_positions, duration):
+    """
+    target_positions: {can_id: [j1, j2, j3, j4], ...} 딕셔너리
+    Kp: 비례 제어 상수 (실험을 통해 적절한 값 0.1~1.0 사이에서 조정 필요)
+    """
+    Kp = 0.26  # Position Error를 Voltage로 변환하는 계수  2100/8192 (max Voltage / max Position)
+    tol = 50  #Position  1.0 [deg] 이내로 수렴 판단 360 / (2*8192) = 0.02  포지면 int 1 당 0.02 [deg]
+
+    start_time = time.time()
+
+    while time.time() - start_time < duration:
+        for can_id in range(2, 6):
+            # 2. Feedback
+            response = pcan.receive_frame(timeout=0.001)
+            
+            if response and response.get('id') == can_id and 'positions' in response:
+                current_pos = response['positions']
+                target_pos = target_positions[can_id]
+                
+                # 3. Calculate error and input V_cmd 
+                # P-Control: Voltage = Kp * (Target - Current)
+                voltages = []
+                for i in range(4):
+
+                    if abs(current_pos[i]) > 8000: # limit Position
+                        v_out = 0
+                    else:
+                        error = target_pos[i] - current_pos[i]
+                        if error < tol:
+                            v_out = 0
+                        else:
+                            v_out = int(error * Kp)
+                        print(f"\nV_out = {v_out}") # for debug
+
+                    # Voltage Saturation
+                    v_out = max(min(v_out, 2000), -2000) 
+                    voltages.append(v_out)
+                pcan.set_target_values(can_id, voltages)
+        
+        time.sleep(0.01) # 100Hz 제어 루프
+
+
+def test_Hand_Voltage_mode():
+    # Initialize PCAN
+    pcan = PCANHandler()
+    if not pcan.is_connected():
+        print("Failed to connect to PCAN")
+        return
+
+    try:
+        print("\n=== Rock Paper Scissors Test ===")
+        print("Setting hand ON with position control mode...")
+        pcan.set_hand_status(ServoStatus.ON, ControlMode.VOLTAGE)
+        time.sleep(1)
+
+        while True:
+            print("\nMenu:")
+            print("1: Make Rock gesture")
+            print("2: Make Scissors gesture")
+            print("3: Make Paper gesture")
+            print("4: Reset to neutral (Paper position)")
+            print("5: Read joint positions")
+            print("6: Make Pencil grip gesture")
+            print("7: Exit")
+            
+            choice = input("\nEnter your choice (1-9): ")
+            
+            if choice in ['1', '2', '3']:
+                gesture = ['rock', 'scissors', 'paper'][int(choice)-1]
+                print(f"\nMaking {gesture} gesture...")
+                positions = GESTURES[gesture]
+                voltage_position_control( pcan, positions, duration= 1.5)
+                # Apply positions for all fingers simultaneously
+            
+                time.sleep(1)
+
+                # 각 손가락의 포지션 값 읽기
+                print("\nReading joint positions:")
+                for can_id in range(2, 6):
+                    response = pcan.receive_frame(timeout=1.0)
+                    if response and 'positions' in response:
+                        finger_name = {
+                            2: "Thumb",
+                            3: "Index",
+                            4: "Middle",
+                            5: "Ring/Little"
+                        }[can_id]
+                        print(f"\n{finger_name} (CAN ID {can_id}):")
+                        for i, pos in enumerate(response['positions']):
+                            print(f"  Joint {i+1}: {pos}")
+                    else:
+                        print(f"\nNo response received for CAN ID {can_id}")
+                
+            elif choice == '4':
+                print("\nResetting to neutral position (Paper)...")
+                positions = GESTURES['paper']
+                voltage_position_control( pcan, positions, duration= 1.5)
+                
+                # 각 손가락의 포지션 값 읽기
+                print("\nReading joint positions:")
+                for can_id in range(2, 6):
+                    response = pcan.receive_frame(timeout=1.0)
+                    if response and 'positions' in response:
+                        finger_name = {
+                            2: "Thumb",
+                            3: "Index",
+                            4: "Middle",
+                            5: "Ring/Little"
+                        }[can_id]
+                        print(f"\n{finger_name} (CAN ID {can_id}):")
+                        for i, pos in enumerate(response['positions']):
+                            print(f"  Joint {i+1}: {pos}")
+                    else:
+                        print(f"\nNo response received for CAN ID {can_id}")
+
             elif choice == '7':
                 test_read_positions()
                 
