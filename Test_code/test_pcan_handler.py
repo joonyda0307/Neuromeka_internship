@@ -1,37 +1,236 @@
 import time
 from pcan_handler import PCANHandler, ServoStatus, ControlMode
+import keyboard 
 
 # Predefined positions for rock-paper-scissors gestures
 GESTURES = {
-    'rock': {
-        # 주먹 쥐기
-        2: [2500, -1000, 2500, 3000],     # 엄지: 안쪽으로 굽히고, z축 회전
+    
+    # Grasping Motions
+    # 1
+    'Side Grasp': {
+        # 원통형 물체 옆으로 잡기 (측정 데이터 반영)
+        2: [3672, -3745, 1155, 2402],  # Thumb
+        3: [142, 1471, 2624, 1298],    # Index
+        4: [133, 2385, 1541, 2263],    # Middle
+        5: [214, 2235, 2106, 1523]     # Ring/Little
+    },
+
+    # 2
+    'Top Grasp': {
+        # 넓은 원통 물체 위에서 아래로 잡기
+        2: [2405, -2683, 794, 2079],   # Thumb
+        3: [-156, 1232, 2101, 1191],   # Index
+        4: [81, 1288, 1601, 2054],     # Middle
+        5: [1903, 3039, 1841, 893]     # Ring/Little
+    },
+
+    # 3
+    'Pinch_2pt': {
+        # 2점 핀치: 엄지와 검지 끝을 맞댐
+        2: [2828, -3215, 1986, 1687],  # Thumb
+        3: [-92, 1925, 2768, 1286],    # Index
+        4: [82, -110, 765, 1843],      # Middle
+        5: [78, -175, 1416, 816]       # Ring/Little
+    },
+
+    # 4
+    'Pinch_3pt': {
+        # 2점 핀치: 엄지와 검지 끝을 맞댐
+        2: [3532, -3110, 890, 3608],   # Thumb
+        3: [-594, 1971, 3615, 1200],   # Index
+        4: [900, 2162, 2650, 2028],    # Middle
+        5: [1160, -678, 1229, 732]     # Ring/Little
+    },
+
+    # 5
+    'Card Grasp': {
+        2: [2351, -3774, 2720, 2235],  # Thumb
+        3: [867, 1335, 4699, 1094],    # Index
+        4: [600, 3680, 4190, 2352],    # Middle
+        5: [149, 4148, 4500, 726]      # Ring/Little
+    },
+
+    # Task Specific Motions
+
+    # 6
+    'grip_pencil': {
+        # 연필 잡기: 엄지, 검지, 중지의 삼각지지
+        2: [2000, -2600, 2500, 2500], 
+        3: [-900, 2000, 2500, 2500], 
+        4: [-1200, 3000, 2500, 2500], 
+        5: [-1200, 3000, 3000, 3000]
+    },
+
+    # 7
+    'rock': { 
+        2: [2500, -1000, 2500, 3000],  # 엄지: 안쪽 접기
         3: [0, 3000, 3000, 3000],     # 검지: 완전히 접기
         4: [0, 3000, 3000, 3000],     # 중지: 완전히 접기
         5: [0, 3000, 3000, 3000]      # 약지/소지: 완전히 접기
     },
+
+    # 8
     'scissors': {
-        # 가위 - 검지와 중지만 펴고 나머지는 접기
-        2: [2500, -1000, 2500, 3000],     # 엄지: 안쪽으로 굽히고, z축 회전
-        3: [0, 0, 0, 0],                # 검지: 펴기(기본 자세)
-        4: [0, 0, 0, 0],                # 중지: 펴기(기본 자세)
-        5: [0, 3000, 3000, 3000]      # 약지/소지: 완전히 접기
+        2: [2500, -1000, 2500, 3000], 
+        3: [0, 0, 0, 0],              # 검지: 펴기
+        4: [0, 0, 0, 0],              # 중지: 펴기
+        5: [0, 3000, 3000, 3000]
     },
+
+    # 9
     'paper': {
-        # 보자기 - 기본 자세(영위치)
-        2: [0, 0, 0, 0],                # 엄지: 기본 자세
-        3: [0, 0, 0, 0],                # 검지: 기본 자세
-        4: [0, 0, 0, 0],                # 중지: 기본 자세
-        5: [0, 0, 0, 0]                 # 약지/소지: 기본 자세
+        2: [0, 0, 0, 0], 
+        3: [0, 0, 0, 0], 
+        4: [0, 0, 0, 0], 
+        5: [0, 0, 0, 0] 
     },
-    'grip_pencil': {
-        # 연필 잡기 - 엄지, 검지, 중지로 연필을 잡는 동작
-        2: [2000, -2600, 2500, 2500],    # 엄지: 모든 관절을 굽혀서 검지/중지와 마주보도록 함
-        3: [-900, 2000, 2500, 2500],       # 검지: 더 굽혀서 엄지와 만나도록 함
-        4: [-1200, 3000, 2500, 2500],       # 중지: 검지와 비슷하게 굽혀서 엄지와 만나도록 함
-        5: [-1200, 3000, 3000, 3000]        # 약지/소지: 완전히 접기
-    }
+    
+    # # 10
+    # 'push_start': {
+    #     2: [2500, -1000, 2500, 3000],  # 엄지: 안쪽 접기
+    #     3: [0, 3000, 3000, 3000],     # 검지: 완전히 접기
+    #     4: [0, 3000, 3000, 3000],     # 중지: 완전히 접기
+    #     5: [0, 3000, 3000, 3000]      # 약지/소지: 완전히 접기
+    # },
+
+    # 'push_end':   {
+    #     2: [2500, -1000, 2500, 3000],  # 엄지: 안쪽 접기
+    #     3: [0, 3000, 3000, 3000],     # 검지: 완전히 접기
+    #     4: [0, 3000, 3000, 3000],     # 중지: 완전히 접기
+    #     5: [0, 3000, 3000, 3000]      # 약지/소지: 완전히 접기
+    # }, # 검지만 최대로 폄 (혹은 굽힘)
+
+    # 11
+    # 'hook_start': {
+    #     2:, 
+    #     3:, 
+    #     4:, 
+    #     5:
+    # },
+
+    # 'hook_end':   {
+    #     2:, 
+    #     3:[0,2000,2000,0], 
+    #     4:, 
+    #     5:
+    # }, # 검지만 갈고리 모양
 }
+
+
+
+# for Emergency stop
+def emergency_reset(pcan, target_positions, filtered_positions):
+    print("\n!!! EMERGENCY STOP ACTIVATED !!!")
+    for can_id in range(2, 6):
+        target_positions[can_id] = list(filtered_positions[can_id])
+        pcan.set_target_values(can_id, target_positions[can_id])
+    
+    pcan.set_hand_status(ServoStatus.OFF, ControlMode.POSITION)
+    print("Torque disabled. Please restart the program to re-enable.")
+    return True
+
+
+# Control test code (made by joon)
+def test_Hand():
+    # Initialize PCAN
+    pcan = PCANHandler()
+    if not pcan.is_connected():
+        print("Failed to connect to PCAN")
+        return
+
+    # prameter setting
+    alpha = 0.05 # alpha: 0.0 ~ 1.0 (1.0에 가까울수록 반응이 빠르고, 0에 가까울수록 부드러움)
+    threshold = 5.0 # Convergence threshold
+    Sampling_freq = 50
+    dt = 1.0 / Sampling_freq
+
+
+    target_positions = {id: [0,0,0,0] for id in range(2, 6)}
+    filtered_positions = {id: [0.0, 0.0, 0.0, 0.0] for id in range(2, 6)}
+    
+    pcan.set_hand_status(ServoStatus.ON, ControlMode.POSITION)
+    time.sleep(0.5) # 서보 안정화 대기
+    # Receive buf를 초기화
+    while pcan.receive_frame(timeout=.01): pass
+    is_emergency = False
+
+    # 매핑 확장 (1~9번까지 GESTURES 키와 연결)
+    gesture_map = {
+        '1': 'Side Grasp',
+        '2': 'Top Grasp',
+        '3': 'Pinch_2pt',
+        '4': 'Pinch_3pt',
+        '5': 'Card Grasp',
+        '6': 'grip_pencil',
+        '7': 'rock',
+        '8': 'scissors',
+        '9': 'paper'
+    }
+
+    # Outer Setting loop
+    while True:
+        # 1. Select gesture
+        print("\n" + "="*30)
+        print(" [ Gesture Menu ]")
+        for key, name in gesture_map.items():
+            print(f" {key}: {name}")
+        print(" 0: Exit (Program End)")
+        print("="*30)
+        choice = input("Select Gesture: ")
+        
+        if choice == '0': break
+        
+        # 2. update target buf
+        if choice in gesture_map:
+            gesture_key = gesture_map[choice]
+            target_update = GESTURES[gesture_key]
+            for can_id in range(2, 6):
+                target_positions[can_id] = target_update[can_id]
+            print(f"\nMoving to [{gesture_key}]... (Press 'ESC' to Stop)")
+        else:
+            print("Invalid choice. Try again.")
+            continue
+
+        # Inner control loop
+        while True:
+            t_start = time.perf_counter()
+
+            # chect emergency stop
+            if keyboard.is_pressed('esc'): 
+                emergency_reset(pcan, target_positions, filtered_positions)
+                is_emergency = True
+                break # Exit inner loop
+
+            max_error = 0
+            for can_id in range(2, 6):
+                # 1. LPF (Low Pass Filter: Y = a*Target + (1-a)*Prev_Y) and 
+                for i in range(4):
+                    filtered_positions[can_id][i] = \
+                        (alpha * target_positions[can_id][i]) + ((1 - alpha) * filtered_positions[can_id][i])
+                    max_error += abs(target_positions[can_id][i] - filtered_positions[can_id][i])
+                
+                # 2. CMD input (change int)
+                cmd = [int(p) for p in filtered_positions[can_id]]
+                print(f"cmd = {cmd}")
+                pcan.set_target_values(can_id, cmd)
+
+            # clear buf
+            while pcan.receive_frame(timeout=0.001): pass
+
+            # 4. Convergence check
+            if max_error < threshold:
+                print("Gesture completed (Converged).")
+                break
+            
+            # Time Idling
+            time.sleep(max(0, dt - (time.perf_counter() - t_start)))
+
+        if is_emergency:
+            print("Exiting due to emergency.")
+            break
+
+    print("Program terminated.")
+
 
 def test_read_positions():
     # Initialize PCAN
@@ -84,231 +283,6 @@ def test_read_positions():
 
         pcan.close()
         print("\nTest complete!")
-
-
-
-def test_Hand_Position_mode():
-    # Initialize PCAN
-    pcan = PCANHandler()
-    if not pcan.is_connected():
-        print("Failed to connect to PCAN")
-        return
-
-    try:
-        print("\n=== Rock Paper Scissors Test ===")
-        print("Setting hand ON with position control mode...")
-        pcan.set_hand_status(ServoStatus.ON, ControlMode.POSITION)
-        time.sleep(1)
-
-        while True:
-            print("\nMenu:")
-            print("1: Make Rock gesture")
-            print("2: Make Scissors gesture")
-            print("3: Make Paper gesture")
-            print("4: Reset to neutral (Paper position)")
-            print("5: Fine-tune current gesture")
-            print("6: Test single finger")
-            print("7: Read joint positions")
-            print("8: Make Pencil grip gesture")
-            print("9: Exit")
-            
-            choice = input("\nEnter your choice (1-9): ")
-            
-            if choice in ['1', '2', '3']:
-                gesture = ['rock', 'scissors', 'paper'][int(choice)-1]
-                print(f"\nMaking {gesture} gesture...")
-                positions = GESTURES[gesture]
-                
-                # Apply positions for all fingers simultaneously
-                for can_id in range(2, 6):
-                    pcan.set_target_values(can_id, positions[can_id])
-
-                time.sleep(1)
-
-                # 각 손가락의 포지션 값 읽기
-
-                # 중요: 수신 전 버퍼에 쌓인 쓸모없는 데이터 싹 비우기
-                # while pcan.receive_frame(timeout=0.01):
-                #     pass
-
-                print("\nReading joint positions:")
-                for can_id in range(2, 6):
-                    response = pcan.receive_frame(timeout=1.0)
-                    if response and 'positions' in response:
-                        finger_name = {
-                            2: "Thumb",
-                            3: "Index",
-                            4: "Middle",
-                            5: "Ring/Little"
-                        }[can_id]
-                        print(f"\n{finger_name} (CAN ID {can_id}):")
-                        for i, pos in enumerate(response['positions']):
-                            print(f"  Joint {i+1}: {pos}")
-                    else:
-                        print(f"\nNo response received for CAN ID {can_id}")
-                
-            elif choice == '4':
-                print("\nResetting to neutral position (Paper)...")
-                positions = GESTURES['paper']
-                for can_id in range(2, 6):
-                    pcan.set_target_values(can_id, positions[can_id])
-                
-                # 각 손가락의 포지션 값 읽기
-                print("\nReading joint positions:")
-                for can_id in range(2, 6):
-                    response = pcan.receive_frame(timeout=1.0)
-                    if response and 'positions' in response:
-                        finger_name = {
-                            2: "Thumb",
-                            3: "Index",
-                            4: "Middle",
-                            5: "Ring/Little"
-                        }[can_id]
-                        print(f"\n{finger_name} (CAN ID {can_id}):")
-                        for i, pos in enumerate(response['positions']):
-                            print(f"  Joint {i+1}: {pos}")
-                    else:
-                        print(f"\nNo response received for CAN ID {can_id}")
-                    
-            elif choice == '5':
-                try:
-                    can_id = int(input("Enter CAN ID to adjust (2-5): "))
-                    if not 2 <= can_id <= 5:
-                        print("Invalid CAN ID. Must be between 2 and 5")
-                        continue
-                    
-                    print("\nEnter positions for each joint (-3000 to 3000):")
-                    positions = []
-                    for i in range(4):
-                        pos = int(input(f"Joint {i+1}: "))
-                        if not -3000 <= pos <= 3000:
-                            print(f"Invalid position value. Must be between -3000 and 3000")
-                            break
-                        positions.append(pos)
-                    
-                    if len(positions) == 4:
-                        pcan.set_target_values(can_id, positions)
-                        print(f"\nAdjusted positions for CAN ID {can_id}: {positions}")
-                        
-                        # 포지션 값 읽기
-                        response = pcan.receive_frame(timeout=1.0)
-                        if response and 'positions' in response:
-                            finger_name = {
-                                2: "Thumb",
-                                3: "Index",
-                                4: "Middle",
-                                5: "Ring/Little"
-                            }[can_id]
-                            print(f"\n{finger_name} (CAN ID {can_id}) current positions:")
-                            for i, pos in enumerate(response['positions']):
-                                print(f"  Joint {i+1}: {pos}")
-                        else:
-                            print(f"\nNo response received for CAN ID {can_id}")
-                    
-                except ValueError:
-                    print("Invalid input. Please enter numbers only.")
-
-            elif choice == '6':
-                try:
-                    print("\nFinger test mode:")
-                    print("CAN ID 2: Thumb")
-                    print("CAN ID 3: Index finger")
-                    print("CAN ID 4: Middle finger")
-                    print("CAN ID 5: Ring/Little fingers")
-                    
-                    can_id = int(input("\nEnter CAN ID to test (2-5): "))
-                    if not 2 <= can_id <= 5:
-                        print("Invalid CAN ID. Must be between 2 and 5")
-                        continue
-
-                    print("\nTesting sequence for selected finger...")
-                    # 단계별로 테스트
-                    test_positions = [
-                        [0, 0, 0, 0],              # 기본 자세
-                        [1500, 0, 0, 0],           # 첫 번째 관절만
-                        [0, 1500, 0, 0],           # 두 번째 관절만
-                        [0, 0, 1500, 0],           # 세 번째 관절만
-                        [0, 0, 0, 1500],           # 네 번째 관절만
-                        [1500, 1500, 1500, 1500],  # 모든 관절 굽히기
-                        [-1500, 0, 0, 0],          # 첫 번째 관절 뒤로
-                        [0, -1500, 0, 0],          # 두 번째 관절 뒤로
-                        [0, 0, -1500, 0],          # 세 번째 관절 뒤로
-                        [0, 0, 0, -1500],          # 네 번째 관절 뒤로
-                        [0, 0, 0, 0]               # 다시 기본 자세
-                    ]
-                    
-                    for i, pos in enumerate(test_positions):
-                        print(f"\nStep {i+1}: Position = {pos}")
-                        pcan.set_target_values(can_id, pos)
-                        
-                        # 포지션 값 읽기
-                        response = pcan.receive_frame(timeout=1.0)
-                        if response and 'positions' in response:
-                            finger_name = {
-                                2: "Thumb",
-                                3: "Index",
-                                4: "Middle",
-                                5: "Ring/Little"
-                            }[can_id]
-                            print(f"Current positions:")
-                            for j, curr_pos in enumerate(response['positions']):
-                                print(f"  Joint {j+1}: {curr_pos}")
-                        else:
-                            print("No response received")
-                        
-                        time.sleep(2)  # 각 동작 관찰을 위한 대기
-                        
-                except ValueError:
-                    print("Invalid input. Please enter numbers only.")
-                
-            elif choice == '7':
-                test_read_positions()
-                
-            elif choice == '8':
-                print("\nMaking pencil grip gesture...")
-                positions = GESTURES['grip_pencil']
-                
-                # Apply positions for all fingers simultaneously
-                for can_id in range(2, 6):
-                    pcan.set_target_values(can_id, positions[can_id])
-                
-                # 각 손가락의 포지션 값 읽기
-                print("\nReading joint positions:")
-                for can_id in range(2, 6):
-                    response = pcan.receive_frame(timeout=1.0)
-                    if response and 'positions' in response:
-                        finger_name = {
-                            2: "Thumb",
-                            3: "Index",
-                            4: "Middle",
-                            5: "Ring/Little"
-                        }[can_id]
-                        print(f"\n{finger_name} (CAN ID {can_id}):")
-                        for i, pos in enumerate(response['positions']):
-                            print(f"  Joint {i+1}: {pos}")
-                    else:
-                        print(f"\nNo response received for CAN ID {can_id}")
-                
-            elif choice == '9':
-                break
-                
-            else:
-                print("Invalid choice. Please enter 1-9")
-
-    except KeyboardInterrupt:
-        print("\nTest interrupted by user")
-    except Exception as e:
-        print(f"\nError during test: {e}")
-    finally:
-        # Clean up
-        print("\nCleaning up...")
-        # Reset to neutral position (paper)
-        positions = GESTURES['paper']
-        for can_id in range(2, 6):
-            pcan.set_target_values(can_id, positions[can_id])
-        pcan.set_hand_status(ServoStatus.OFF, ControlMode.POSITION)
-        pcan.close()
-        print("Test completed")
 
 
 def voltage_position_control(pcan, target_positions, duration):
@@ -476,5 +450,5 @@ def test_Hand_Voltage_mode():
         print("Test completed")
 
 if __name__ == "__main__":
-    # test_rock_paper_scissors()
-    test_read_positions()
+    # test_read_positions()
+    test_Hand()
