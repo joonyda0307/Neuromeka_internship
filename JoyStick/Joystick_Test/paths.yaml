@@ -1,0 +1,3 @@
+config: ../MediConfigurations # config 경로
+module: ./modules # config 경로
+

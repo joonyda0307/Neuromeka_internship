@@ -1,0 +1,43 @@
+{
+  "actions": {
+    "zoom_out": null,
+    "zoom_in": null,
+    "emergency": null,
+    "enable": null,
+    "rotate_cw": null,
+    "rotate_ccw": null,
+    "tilt_left": null,
+    "tilt_right": null,
+    "tilt_up": null,
+    "tilt_down": null
+  },
+
+  "controllers": {
+    "handheld": {
+      "buttons": {
+        "x1": 2,
+        "x2": 3,
+        "x3": 0,
+        "x4": 1,
+        "x5":4,
+        "R":8,
+        "R_2":9
+      },
+      "axes": {
+        "up_down":1,
+        "left_right":0,
+        "trigger":4
+      }
+    }
+
+  },
+  "model": "mini",
+  "deadzone": 0.01,
+  "max_distance": 10,
+  "max_delta": {
+    "zoom": 20,
+    "tilt_w": 30,
+    "tilt_u": 15,
+    "tilt_v": 15
+  }
+}
